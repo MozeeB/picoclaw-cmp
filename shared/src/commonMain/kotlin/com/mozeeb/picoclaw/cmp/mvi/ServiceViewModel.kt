@@ -10,6 +10,7 @@ import com.mozeeb.picoclaw.cmp.core.CoreServiceAdapter
 import com.mozeeb.picoclaw.cmp.core.DownloadResult
 import com.mozeeb.picoclaw.cmp.core.SettingsRepository
 import com.mozeeb.picoclaw.cmp.core.pickBinaryFile
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,41 +92,42 @@ class ServiceViewModel(
     // -------------------------------------------------------------------------
 
     private fun startService() {
-        val current = _state.value
-        if (current.status != ServiceStatus.Stopped) return
+        if (_state.value.status != ServiceStatus.Stopped) return
+        viewModelScope.launch { doStart() }
+    }
 
+    /** Actually launch the service from the current state. Reused by start + public-mode restart. */
+    private suspend fun doStart() {
+        val current = _state.value
         _state.update { it.copy(status = ServiceStatus.Starting, errorMessage = null) }
-        viewModelScope.launch {
-            try {
-                // Public mode: bind to all interfaces (0.0.0.0) and add the -public flag so the
-                // binary listens on the LAN. Mirrors picoclaw_fui ServiceManager.start().
-                val effectiveArgs = buildEffectiveArgs(current.extraArgs, current.publicMode)
-                adapter.start(
-                    host = current.bindHost,
-                    port = current.port,
-                    path = current.path,
-                    binaryPath = current.binaryPath,
-                    extraArgs = effectiveArgs,
+        try {
+            // Public mode: the -public flag makes the binary listen on all interfaces (LAN).
+            // Mirrors picoclaw_fui ServiceManager.start().
+            val effectiveArgs = buildEffectiveArgs(current.extraArgs, current.publicMode)
+            adapter.start(
+                host = current.bindHost,
+                port = current.port,
+                path = current.path,
+                binaryPath = current.binaryPath,
+                extraArgs = effectiveArgs,
+            )
+            _state.update { it.copy(status = ServiceStatus.Running, binaryFound = true) }
+            analytics.logEvent(Analytics.EVENT_SERVICE_START, mapOf("public" to current.publicMode.toString()))
+        } catch (e: BinaryNotFoundException) {
+            _state.update {
+                it.copy(
+                    status = ServiceStatus.Stopped,
+                    binaryFound = false,
+                    binarySearchedPaths = e.searchedPaths,
+                    errorMessage = "Binary not found. Set the path in Config → Binary path.",
                 )
-                _state.update { it.copy(status = ServiceStatus.Running, binaryFound = true) }
-                analytics.logEvent(Analytics.EVENT_SERVICE_START, mapOf("public" to current.publicMode.toString()))
-            } catch (e: BinaryNotFoundException) {
-                // Friendly message — guide user to Config page
-                _state.update {
-                    it.copy(
-                        status = ServiceStatus.Stopped,
-                        binaryFound = false,
-                        binarySearchedPaths = e.searchedPaths,
-                        errorMessage = "Binary not found. Set the path in Config → Binary path.",
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        status = ServiceStatus.Stopped,
-                        errorMessage = e.message ?: "Unknown error starting service",
-                    )
-                }
+            }
+        } catch (e: Exception) {
+            _state.update {
+                it.copy(
+                    status = ServiceStatus.Stopped,
+                    errorMessage = e.message ?: "Unknown error starting service",
+                )
             }
         }
     }
@@ -169,14 +171,20 @@ class ServiceViewModel(
      * - when disabled, clear the device IP (URL/QR fall back to the configured host)
      */
     private fun togglePublicMode(enabled: Boolean) {
+        val wasRunning = _state.value.status == ServiceStatus.Running
         _state.update { it.copy(publicMode = enabled) }
         viewModelScope.launch {
             settings.savePublicMode(enabled)
-            if (enabled) {
-                val ip = adapter.getDeviceIpAddress()
-                _state.update { it.copy(deviceIp = ip) }
-            } else {
-                _state.update { it.copy(deviceIp = null) }
+            _state.update { it.copy(deviceIp = if (enabled) adapter.getDeviceIpAddress() else null) }
+
+            // The bind mode (`-public`) is fixed when the process starts, so a running service
+            // must be restarted for the change to take effect (else it stays localhost-only).
+            if (wasRunning) {
+                _state.update { it.copy(status = ServiceStatus.Stopping) }
+                runCatching { adapter.stop() }
+                _state.update { it.copy(status = ServiceStatus.Stopped) }
+                delay(800) // let the port free up before re-binding
+                doStart()
             }
         }
     }
