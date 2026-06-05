@@ -278,16 +278,30 @@ Locale selection stored in DataStore; applied at root `MaterialTheme` via `Compo
 
 | Feature | Android | Desktop (JVM) | iOS | Web |
 |---------|---------|--------------|-----|-----|
-| Service start/stop | `PicoClawForegroundService` | Process spawn | Stub | Stub |
-| System tray | N/A | Phase 4 | N/A | N/A |
-| Window management | `WindowManager` | `ComposeWindow` / Swing | UIKit | Browser |
-| WebView | `android.webkit.WebView` | Opens in system browser | Stub (Phase 4) | Stub (Phase 4) |
-| Auto-start on boot | Phase 4 | Phase 4 | N/A | N/A |
-| Notifications | Phase 4 | Phase 4 | N/A | N/A |
+| Service start/stop | ✅ `PicoClawForegroundService` | ✅ Process spawn | Stub | Stub |
+| System tray | N/A | ✅ Compose `Tray` | N/A | N/A |
+| Window management | `WindowManager` | ✅ `ComposeWindow` + `WindowStateStore` | UIKit | Browser |
+| WebView | ✅ `android.webkit.WebView` | Opens in system browser | Stub (Phase 4) | Stub (Phase 4) |
+| Auto-start on boot | ✅ `BootReceiver` | Phase 4 | N/A | N/A |
+| Notifications | ✅ foreground notification | Phase 4 | N/A | N/A |
 | Firebase Analytics | Phase 4 | No-op | No-op | No-op |
 | DataStore | ✅ `DataStoreSettings` | ✅ `DataStoreSettings` | ✅ `DataStoreSettings` | `InMemorySettings` |
 
 Stub actuals call `println("WARN: [feature] not supported on [platform]")`.
+
+### ⚠️ Android cleartext (WebView) — required for local HTTP
+
+Android ≥ 9 (API 28) blocks cleartext HTTP by default, but the PicoClaw web UI is plain `http://`.
+Two coordinated pieces keep the embedded WebView working:
+
+1. **`androidApp/src/main/res/xml/network_security_config.xml`** permits cleartext **only to loopback**
+   (`127.0.0.1`, `localhost`, `0.0.0.0`), referenced via `android:networkSecurityConfig` in the manifest.
+2. **The WebView loads `ServiceState.localWebUrl`, not `webUrl`.** `localWebUrl` always targets the
+   loopback host (`127.0.0.1`) — the binary binds `0.0.0.0` in public mode, so loopback is always
+   reachable on-device, and it stays inside the cleartext allow-list. `webUrl` (which uses the LAN IP
+   in public mode) is reserved for the QR code / shareable URL only.
+
+Regression to avoid: pointing the embedded WebView at `webUrl` (LAN IP) → `ERR_CLEARTEXT_NOT_PERMITTED`.
 
 ---
 
