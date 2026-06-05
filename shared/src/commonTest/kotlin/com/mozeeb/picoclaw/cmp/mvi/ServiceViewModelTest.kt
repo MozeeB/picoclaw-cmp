@@ -1,6 +1,7 @@
 package com.mozeeb.picoclaw.cmp.mvi
 
 import com.mozeeb.picoclaw.cmp.FakeAppSettings
+import com.mozeeb.picoclaw.cmp.core.Analytics
 import com.mozeeb.picoclaw.cmp.core.BinaryDownloader
 import com.mozeeb.picoclaw.cmp.core.BinaryValidation
 import com.mozeeb.picoclaw.cmp.core.CoreServiceAdapter
@@ -93,6 +94,13 @@ class ServiceViewModelTest {
         }
     }
 
+    private class FakeAnalytics : Analytics {
+        var collectionEnabled = false
+        val events = mutableListOf<String>()
+        override fun setEnabled(enabled: Boolean) { collectionEnabled = enabled }
+        override fun logEvent(name: String, params: Map<String, String>) { events += name }
+    }
+
     private class FakeSettings : SettingsRepository(FakeAppSettings()) {
         var savedTheme: String? = null
         var savedLocale: String? = null
@@ -120,10 +128,11 @@ class ServiceViewModelTest {
     private fun makeViewModel(
         adapter: FakeAdapter = FakeAdapter(),
         downloader: BinaryDownloader = FakeDownloader(),
+        analytics: Analytics = FakeAnalytics(),
     ): Pair<ServiceViewModel, FakeAdapter> {
         val fake = adapter
         val settings = FakeSettings()
-        val vm = ServiceViewModel(fake, settings, downloader)
+        val vm = ServiceViewModel(fake, settings, downloader, analytics)
         return vm to fake
     }
 
@@ -324,6 +333,38 @@ class ServiceViewModelTest {
         advanceUntilIdle()
         val url = vm.state.value.localWebUrl
         assertTrue(url.startsWith("http://127.0.0.1:18800"), "Expected loopback URL, got: $url")
+    }
+
+    // -------------------------------------------------------------------------
+    // Telemetry / analytics
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun given_telemetryOff_when_toggleOn_then_analyticsEnabledAndStatePersisted() = runTest {
+        val analytics = FakeAnalytics()
+        val (vm, _) = makeViewModel(analytics = analytics)
+        advanceUntilIdle()
+        assertFalse(vm.state.value.isTelemetryEnabled)
+
+        vm.onIntent(ServiceIntent.ToggleTelemetry(true))
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.isTelemetryEnabled)
+        assertTrue(analytics.collectionEnabled, "Analytics collection should be enabled")
+    }
+
+    @Test
+    fun given_running_when_stop_then_serviceStopEventLogged() = runTest {
+        val analytics = FakeAnalytics()
+        val (vm, _) = makeViewModel(analytics = analytics)
+        advanceUntilIdle()
+        vm.onIntent(ServiceIntent.StartService)
+        vm.state.first { it.status == ServiceStatus.Running }
+        vm.onIntent(ServiceIntent.StopService)
+        vm.state.first { it.status == ServiceStatus.Stopped }
+
+        assertTrue(analytics.events.contains(Analytics.EVENT_SERVICE_START))
+        assertTrue(analytics.events.contains(Analytics.EVENT_SERVICE_STOP))
     }
 
     // -------------------------------------------------------------------------

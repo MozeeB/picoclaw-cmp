@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Desktop system tray** (Compose `Tray`): show/hide window, start/stop service, quit; minimize-to-tray on window close — tray and UI share one `ServiceViewModel`.
 - **Desktop window-state persistence**: window size & position are saved and restored across launches.
 - **Android auto-start on boot**: `BootReceiver` starts the foreground service after reboot when "Auto-start on launch" is enabled.
+- **Localization**: in-house type-safe i18n covering all 12 locales (en, zh, es, fr, de, ru, pt, ja, ko, id, ar, hi); switching language in Config updates the whole UI instantly.
+- **Analytics**: `Analytics` abstraction with a no-op default and an `AndroidAnalytics` stub (Firebase-ready), gated by the Telemetry toggle and persisted.
+- **iOS WebView**: native `WKWebView` embedded via `UIKitView`.
 
 ### Fixed
 - **Android WebView `ERR_CLEARTEXT_NOT_PERMITTED`**: added a network-security-config permitting

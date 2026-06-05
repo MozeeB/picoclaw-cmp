@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mozeeb.picoclaw.cmp.core.UiConstants
+import com.mozeeb.picoclaw.cmp.i18n.LocalStrings
 import com.mozeeb.picoclaw.cmp.mvi.ServiceIntent
 import com.mozeeb.picoclaw.cmp.mvi.ServiceState
 import com.mozeeb.picoclaw.cmp.ui.AppThemeMode
@@ -75,6 +76,7 @@ fun ConfigPage(
     state: ServiceState,
     onIntent: (ServiceIntent) -> Unit,
 ) {
+    val s = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -89,7 +91,7 @@ fun ConfigPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "CONFIG",
+                text = s.configTitle,
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.weight(1f),
@@ -103,7 +105,7 @@ fun ConfigPage(
                 ) {
                     Icon(
                         Icons.Filled.Save,
-                        contentDescription = "Save config",
+                        contentDescription = s.saveConfig,
                         tint = MaterialTheme.colorScheme.secondary,
                     )
                 }
@@ -113,23 +115,23 @@ fun ConfigPage(
         Spacer(Modifier.height(8.dp))
 
         // Server settings section
-        SectionCard(title = "Server") {
+        SectionCard(title = s.sectionServer) {
             ConfigTextField(
-                label = "Host",
+                label = s.host,
                 value = state.host,
                 onValueChange = { onIntent(ServiceIntent.UpdateHost(it)) },
                 placeholder = "127.0.0.1",
             )
             Spacer(Modifier.height(8.dp))
             ConfigTextField(
-                label = "Port",
+                label = s.port,
                 value = state.port.toString(),
                 onValueChange = { v -> v.toIntOrNull()?.let { onIntent(ServiceIntent.UpdatePort(it)) } },
                 placeholder = "18800",
             )
             Spacer(Modifier.height(8.dp))
             ConfigTextField(
-                label = "Path",
+                label = s.path,
                 value = state.path,
                 onValueChange = { onIntent(ServiceIntent.UpdatePath(it)) },
                 placeholder = "/",
@@ -139,9 +141,9 @@ fun ConfigPage(
         Spacer(Modifier.height(8.dp))
 
         // Binary section
-        SectionCard(title = "Binary") {
+        SectionCard(title = s.sectionBinary) {
             ConfigTextField(
-                label = "Binary path",
+                label = s.binaryPath,
                 value = state.binaryPath,
                 onValueChange = { onIntent(ServiceIntent.UpdateBinaryPath(it)) },
                 placeholder = "~/.picoclaw/bin/picoclaw",
@@ -170,14 +172,14 @@ fun ConfigPage(
 
             Spacer(Modifier.height(12.dp))
             ConfigTextField(
-                label = "Extra args",
+                label = s.extraArgs,
                 value = state.extraArgs,
                 onValueChange = { onIntent(ServiceIntent.UpdateExtraArgs(it)) },
                 placeholder = "--verbose",
             )
             Spacer(Modifier.height(8.dp))
             ConfigSwitchRow(
-                label = "Auto-start on launch",
+                label = s.autoStart,
                 checked = state.autoStart,
                 onCheckedChange = { onIntent(ServiceIntent.ToggleAutoStart(it)) },
             )
@@ -186,7 +188,7 @@ fun ConfigPage(
         Spacer(Modifier.height(8.dp))
 
         // Theme section
-        SectionCard(title = "Theme") {
+        SectionCard(title = s.sectionTheme) {
             ThemePicker(
                 selected = state.theme,
                 onSelect = { onIntent(ServiceIntent.SelectTheme(it)) },
@@ -196,7 +198,7 @@ fun ConfigPage(
         Spacer(Modifier.height(8.dp))
 
         // Language section
-        SectionCard(title = "Language") {
+        SectionCard(title = s.sectionLanguage) {
             LanguagePicker(
                 selected = state.locale,
                 onSelect = { onIntent(ServiceIntent.SelectLocale(it)) },
@@ -206,10 +208,10 @@ fun ConfigPage(
         Spacer(Modifier.height(8.dp))
 
         // Telemetry
-        SectionCard(title = "Telemetry") {
+        SectionCard(title = s.sectionTelemetry) {
             ConfigSwitchRow(
-                label = "Enable analytics",
-                description = "Help improve PicoClaw by sending anonymous usage data.",
+                label = s.enableAnalytics,
+                description = s.enableAnalyticsDesc,
                 checked = state.isTelemetryEnabled,
                 onCheckedChange = { onIntent(ServiceIntent.ToggleTelemetry(it)) },
             )
@@ -247,10 +249,11 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun BinaryStatusRow(found: Boolean?) {
     val cs = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     val (icon, tint, label) = when (found) {
-        true -> Triple(Icons.Filled.CheckCircle, cs.secondary, "Binary found")
-        false -> Triple(Icons.Filled.ErrorOutline, cs.error, "Binary not found")
-        null -> Triple(Icons.Filled.ErrorOutline, cs.onSurfaceVariant, "Not validated")
+        true -> Triple(Icons.Filled.CheckCircle, cs.secondary, s.binaryFoundStatus)
+        false -> Triple(Icons.Filled.ErrorOutline, cs.error, s.binaryMissingStatus)
+        null -> Triple(Icons.Filled.ErrorOutline, cs.onSurfaceVariant, s.notValidated)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
@@ -269,6 +272,7 @@ private fun BinaryActions(
     onDownload: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -283,7 +287,7 @@ private fun BinaryActions(
         ) {
             Icon(Icons.Filled.FolderOpen, null, Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Browse", style = MaterialTheme.typography.labelMedium)
+            Text(s.browse, style = MaterialTheme.typography.labelMedium)
         }
 
         // Validate
@@ -295,7 +299,7 @@ private fun BinaryActions(
         ) {
             Icon(Icons.Filled.Check, null, Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Validate", style = MaterialTheme.typography.labelMedium)
+            Text(s.validate, style = MaterialTheme.typography.labelMedium)
         }
 
         // Download (only on supported platforms)
@@ -320,7 +324,7 @@ private fun BinaryActions(
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    if (isDownloading) "Downloading…" else "Download",
+                    if (isDownloading) s.downloading else s.download,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -504,7 +508,7 @@ private fun LanguagePicker(selected: String, onSelect: (String) -> Unit) {
             value = currentLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Language") },
+            label = { Text(LocalStrings.current.sectionLanguage) },
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = true },

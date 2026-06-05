@@ -1,9 +1,11 @@
 package com.mozeeb.picoclaw.cmp.di
 
+import com.mozeeb.picoclaw.cmp.core.Analytics
 import com.mozeeb.picoclaw.cmp.core.AppSettings
 import com.mozeeb.picoclaw.cmp.core.BinaryDownloader
 import com.mozeeb.picoclaw.cmp.core.CoreServiceAdapter
 import com.mozeeb.picoclaw.cmp.core.InMemorySettings
+import com.mozeeb.picoclaw.cmp.core.NoOpAnalytics
 import com.mozeeb.picoclaw.cmp.core.WasmJsBinaryDownloader
 import com.mozeeb.picoclaw.cmp.core.WasmJsCoreServiceAdapter
 import org.koin.core.module.Module
@@ -13,4 +15,5 @@ actual fun platformModule(): Module = module {
     single<CoreServiceAdapter> { WasmJsCoreServiceAdapter() }
     single<AppSettings> { InMemorySettings() }
     single<BinaryDownloader> { WasmJsBinaryDownloader() }
+    single<Analytics> { NoOpAnalytics() }
 }

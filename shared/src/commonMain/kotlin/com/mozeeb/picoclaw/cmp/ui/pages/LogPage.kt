@@ -57,6 +57,7 @@ fun LogPage(
     state: ServiceState,
     onIntent: (ServiceIntent) -> Unit,
 ) {
+    val s = com.mozeeb.picoclaw.cmp.i18n.LocalStrings.current
     var filterText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -85,7 +86,7 @@ fun LogPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "LOGS",
+                text = s.logsTitle,
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.weight(1f),
@@ -99,7 +100,7 @@ fun LogPage(
             ) {
                 Icon(
                     Icons.Filled.Share,
-                    contentDescription = "Export logs",
+                    contentDescription = s.exportLogs,
                     tint = MaterialTheme.colorScheme.secondary,
                 )
             }
@@ -113,7 +114,7 @@ fun LogPage(
             ) {
                 Icon(
                     Icons.Filled.Clear,
-                    contentDescription = "Clear logs",
+                    contentDescription = s.clearLogs,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -124,6 +125,7 @@ fun LogPage(
         // Filter bar
         FilterBar(
             text = filterText,
+            placeholder = s.filterLogs,
             onTextChange = { filterText = it },
         )
 
@@ -131,7 +133,7 @@ fun LogPage(
 
         // Log count
         Text(
-            text = "${filteredLogs.size} entries",
+            text = "${filteredLogs.size} ${s.entries}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -140,7 +142,9 @@ fun LogPage(
 
         // Log list
         if (filteredLogs.isEmpty()) {
-            EmptyLogs(isFiltered = filterText.isNotBlank())
+            EmptyLogs(
+                message = if (filterText.isNotBlank()) s.noLogsFiltered else s.noLogs,
+            )
         } else {
             LazyColumn(
                 state = listState,
@@ -156,7 +160,7 @@ fun LogPage(
 }
 
 @Composable
-private fun FilterBar(text: String, onTextChange: (String) -> Unit) {
+private fun FilterBar(text: String, placeholder: String, onTextChange: (String) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(UiConstants.cardRadius),
@@ -186,7 +190,7 @@ private fun FilterBar(text: String, onTextChange: (String) -> Unit) {
                 decorationBox = { inner ->
                     if (text.isEmpty()) {
                         Text(
-                            "Filter logs…",
+                            placeholder,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -212,13 +216,13 @@ private fun LogEntry(line: String) {
 }
 
 @Composable
-private fun EmptyLogs(isFiltered: Boolean) {
+private fun EmptyLogs(message: String) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (isFiltered) "No logs matching filter." else "No logs yet. Start the service to see output.",
+            text = message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

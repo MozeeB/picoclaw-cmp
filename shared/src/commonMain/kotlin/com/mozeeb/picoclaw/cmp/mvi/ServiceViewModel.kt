@@ -2,6 +2,7 @@ package com.mozeeb.picoclaw.cmp.mvi
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mozeeb.picoclaw.cmp.core.Analytics
 import com.mozeeb.picoclaw.cmp.core.BinaryDownloader
 import com.mozeeb.picoclaw.cmp.core.BinaryNotFoundException
 import com.mozeeb.picoclaw.cmp.core.BinaryValidation
@@ -23,6 +24,7 @@ class ServiceViewModel(
     private val adapter: CoreServiceAdapter,
     private val settings: SettingsRepository,
     private val downloader: BinaryDownloader,
+    private val analytics: Analytics,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -33,6 +35,8 @@ class ServiceViewModel(
     init {
         viewModelScope.launch {
             loadSettings()
+            // Apply the persisted telemetry preference to analytics on launch.
+            analytics.setEnabled(_state.value.isTelemetryEnabled)
             // Auto-validate binary after settings are loaded so the UI can show
             // the "binary not found" banner immediately on launch.
             validateBinary()
@@ -72,7 +76,7 @@ class ServiceViewModel(
             is ServiceIntent.TogglePublicMode -> togglePublicMode(intent.enabled)
             is ServiceIntent.SetDeviceIp      -> _state.update { it.copy(deviceIp = intent.ip) }
 
-            is ServiceIntent.ToggleTelemetry -> _state.update { it.copy(isTelemetryEnabled = intent.enabled) }
+            is ServiceIntent.ToggleTelemetry -> toggleTelemetry(intent.enabled)
 
             is ServiceIntent.AppendLog -> _state.update { it.copy(logs = it.logs + intent.line) }
             ServiceIntent.ClearLogs    -> _state.update { it.copy(logs = emptyList()) }
@@ -104,6 +108,7 @@ class ServiceViewModel(
                     extraArgs = effectiveArgs,
                 )
                 _state.update { it.copy(status = ServiceStatus.Running, binaryFound = true) }
+                analytics.logEvent(Analytics.EVENT_SERVICE_START, mapOf("public" to current.publicMode.toString()))
             } catch (e: BinaryNotFoundException) {
                 // Friendly message — guide user to Config page
                 _state.update {
@@ -133,8 +138,16 @@ class ServiceViewModel(
                 adapter.stop()
             } finally {
                 _state.update { it.copy(status = ServiceStatus.Stopped) }
+                analytics.logEvent(Analytics.EVENT_SERVICE_STOP)
             }
         }
+    }
+
+    /** Persist the telemetry preference and propagate it to analytics collection. */
+    private fun toggleTelemetry(enabled: Boolean) {
+        _state.update { it.copy(isTelemetryEnabled = enabled) }
+        analytics.setEnabled(enabled)
+        viewModelScope.launch { settings.saveTelemetry(enabled) }
     }
 
     private suspend fun validateBinary() {
@@ -216,6 +229,7 @@ class ServiceViewModel(
                             binarySearchedPaths = emptyList(),
                         )
                     }
+                    analytics.logEvent(Analytics.EVENT_BINARY_DOWNLOAD, mapOf("result" to "success"))
                     // Persist the resolved binary path
                     settings.saveConfig(
                         host = _state.value.host,
@@ -254,6 +268,7 @@ class ServiceViewModel(
 
     private fun selectTheme(theme: com.mozeeb.picoclaw.cmp.ui.AppThemeMode) {
         _state.update { it.copy(theme = theme) }
+        analytics.logEvent(Analytics.EVENT_THEME_SELECT, mapOf("theme" to theme.name))
         viewModelScope.launch { settings.saveTheme(theme.name) }
     }
 

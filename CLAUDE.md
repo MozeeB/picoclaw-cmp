@@ -222,13 +222,13 @@ iosMain.dependencies    { implementation(libs.datastore.preferences) }
   - Desktop: opens in system browser (`java.awt.Desktop`)
   - iOS/Web: stub with TODO note
 
-### Phase 4 — Platform Polish (In progress)
+### Phase 4 — Platform Polish ✅ Complete
 - [x] Desktop: system tray (Compose `Tray`) — show/hide window, start/stop service, quit; minimize-to-tray on close
 - [x] Desktop: window size/position persistence via `WindowStateStore` (AppSettings/DataStore)
 - [x] Android: `PicoClawForegroundService` (Phase 2) + `BootReceiver` auto-start when `autoStart` enabled
-- [ ] Localization: 12-language string resources in `composeResources/values-*/`
-- [ ] Firebase Analytics stub (androidMain actual, no-op on other platforms)
-- [ ] iOS: WKWebView integration in `PlatformWebView.ios.kt`
+- [x] Localization: in-house type-safe i18n (`i18n/AppStrings.kt`) for all 12 locales
+- [x] Analytics stub: `Analytics` interface + `NoOpAnalytics` + `AndroidAnalytics` (Firebase-ready), gated by telemetry toggle
+- [x] iOS: `WKWebView` via `UIKitView` in `PlatformWebView.ios.kt`
 
 > **Desktop tray + UI share one `ServiceViewModel`.** `App(viewModel = koinViewModel())` accepts an
 > injected VM; the desktop entry point constructs it once (`ServiceViewModel(koin.get(), koin.get(), koin.get())`)
@@ -259,18 +259,26 @@ Rules:
 
 ---
 
-## 6. Localization
+## 6. Localization — in-house type-safe i18n
 
 12 supported locales (same as `picoclaw_fui`):
 `en`, `zh`, `es`, `fr`, `de`, `ru`, `pt`, `ja`, `ko`, `id`, `ar`, `hi`
 
-Resources live in Compose Multiplatform resource directories:
-- Default: `composeResources/values/strings.xml`
-- Per locale: `composeResources/values-zh/strings.xml`, `composeResources/values-es/strings.xml`, etc.
+**Why in-house instead of `composeResources` strings.xml:** manual (in-app) locale override for
+compose-resources is version-sensitive across CMP releases. A type-safe `AppStrings` bundle keyed
+on `state.locale` switches language instantly on every platform with zero platform locale plumbing.
 
-Access via: `stringResource(Res.string.key_name)`
+| File | Role |
+|------|------|
+| `i18n/AppStrings.kt` | `data class AppStrings` (all keys) + canonical `StringsEn` + `stringsFor(locale)` + `LocalStrings` CompositionLocal |
+| `i18n/AppStringsLocales1.kt` | zh, es, fr, de, ru |
+| `i18n/AppStringsLocales2.kt` | pt, ja, ko, id, ar, hi |
 
-Locale selection stored in DataStore; applied at root `MaterialTheme` via `CompositionLocalProvider(LocaleProvider)`.
+- Provided once at the App root: `CompositionLocalProvider(LocalStrings provides stringsFor(state.locale))`.
+- Read in any composable via `LocalStrings.current.<key>` (e.g. `s.start`, `s.dashboardTitle`).
+- Changing `ServiceIntent.SelectLocale` updates `state.locale` → recomposition → new bundle.
+- Unknown locales fall back to `StringsEn`. To add a key: add the field + a value in every bundle.
+- Language names in the picker are **endonyms** (English, 中文, …) — intentionally not translated.
 
 ---
 
@@ -281,10 +289,11 @@ Locale selection stored in DataStore; applied at root `MaterialTheme` via `Compo
 | Service start/stop | ✅ `PicoClawForegroundService` | ✅ Process spawn | Stub | Stub |
 | System tray | N/A | ✅ Compose `Tray` | N/A | N/A |
 | Window management | `WindowManager` | ✅ `ComposeWindow` + `WindowStateStore` | UIKit | Browser |
-| WebView | ✅ `android.webkit.WebView` | Opens in system browser | Stub (Phase 4) | Stub (Phase 4) |
-| Auto-start on boot | ✅ `BootReceiver` | Phase 4 | N/A | N/A |
-| Notifications | ✅ foreground notification | Phase 4 | N/A | N/A |
-| Firebase Analytics | Phase 4 | No-op | No-op | No-op |
+| WebView | ✅ `android.webkit.WebView` | Opens in system browser | ✅ `WKWebView` (UIKitView) | Stub |
+| Auto-start on boot | ✅ `BootReceiver` | OS startup (future) | N/A | N/A |
+| Notifications | ✅ foreground notification | future | N/A | N/A |
+| Analytics | ✅ `AndroidAnalytics` (Firebase-ready) | `NoOpAnalytics` | `NoOpAnalytics` | `NoOpAnalytics` |
+| Localization (12 locales) | ✅ in-house `AppStrings` | ✅ | ✅ | ✅ |
 | DataStore | ✅ `DataStoreSettings` | ✅ `DataStoreSettings` | ✅ `DataStoreSettings` | `InMemorySettings` |
 
 Stub actuals call `println("WARN: [feature] not supported on [platform]")`.

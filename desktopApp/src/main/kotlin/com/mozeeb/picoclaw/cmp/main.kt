@@ -38,7 +38,7 @@ fun main() {
     application {
         // One ServiceViewModel shared between the system tray and the window UI,
         // so tray-initiated start/stop is reflected in the UI and vice-versa.
-        val viewModel = remember { ServiceViewModel(koin.get(), koin.get(), koin.get()) }
+        val viewModel = remember { ServiceViewModel(koin.get(), koin.get(), koin.get(), koin.get()) }
         val state by viewModel.state.collectAsState()
 
         var windowVisible by remember { mutableStateOf(true) }

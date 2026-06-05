@@ -18,5 +18,5 @@ import org.koin.dsl.module
  */
 val appModule = module {
     single { SettingsRepository(get()) }
-    viewModel { ServiceViewModel(get(), get(), get()) }
+    viewModel { ServiceViewModel(get(), get(), get(), get()) }
 }

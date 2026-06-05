@@ -73,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mozeeb.picoclaw.cmp.core.UiConstants
+import com.mozeeb.picoclaw.cmp.i18n.LocalStrings
 import com.mozeeb.picoclaw.cmp.mvi.ServiceIntent
 import com.mozeeb.picoclaw.cmp.mvi.ServiceState
 import com.mozeeb.picoclaw.cmp.mvi.ServiceStatus
@@ -86,6 +87,7 @@ fun DashboardPage(
     /** Called when user taps "Go to Config" from the binary-missing banner. */
     onNavigateToConfig: () -> Unit = {},
 ) {
+    val s = LocalStrings.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     @Suppress("DEPRECATION")
@@ -101,7 +103,7 @@ fun DashboardPage(
         ) {
             // Page title
             Text(
-                text = "Dashboard",
+                text = s.dashboardTitle,
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp,
@@ -135,7 +137,7 @@ fun DashboardPage(
                 url = state.webUrl,
                 onCopy = {
                     clipboard.setText(AnnotatedString(state.webUrl))
-                    scope.launch { snackbarHostState.showSnackbar("URL copied to clipboard") }
+                    scope.launch { snackbarHostState.showSnackbar(s.urlCopied) }
                 },
             )
 
@@ -183,6 +185,7 @@ private fun BinaryMissingBanner(
     onDownload: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(UiConstants.cardRadius),
@@ -204,26 +207,20 @@ private fun BinaryMissingBanner(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Binary not found",
+                    text = s.binaryNotFoundTitle,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = cs.onErrorContainer,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = if (isDownloadSupported) {
-                        "The picoclaw binary was not found. Download it automatically, " +
-                            "or set the path manually in Config."
-                    } else {
-                        "The picoclaw binary was not found in any of the default locations. " +
-                            "Set the binary path in Config."
-                    },
+                    text = if (isDownloadSupported) s.binaryNotFoundDesc else s.binaryNotFoundDescNoDownload,
                     style = MaterialTheme.typography.bodySmall,
                     color = cs.onErrorContainer.copy(alpha = 0.85f),
                 )
                 if (searchedPaths.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "Searched:\n" + searchedPaths.take(4).joinToString("\n") { "• $it" },
+                        text = "${s.searched}\n" + searchedPaths.take(4).joinToString("\n") { "• $it" },
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 10.sp,
@@ -243,7 +240,7 @@ private fun BinaryMissingBanner(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Downloading… ${(downloadProgress * 100).toInt()}%",
+                        text = "${s.downloading} ${(downloadProgress * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = cs.onErrorContainer,
                     )
@@ -264,7 +261,7 @@ private fun BinaryMissingBanner(
                             Icon(Icons.Filled.CloudDownload, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                if (isDownloading) "Downloading…" else "Download binary",
+                                if (isDownloading) s.downloading else s.downloadBinary,
                                 style = MaterialTheme.typography.labelMedium,
                             )
                         }
@@ -273,7 +270,7 @@ private fun BinaryMissingBanner(
                         onClick = onGoToConfig,
                         colors = ButtonDefaults.textButtonColors(contentColor = cs.error),
                     ) {
-                        Text("Config →", style = MaterialTheme.typography.labelMedium)
+                        Text(s.goToConfig, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -292,6 +289,7 @@ private fun StatusHeroCard(
     onStop: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val s = LocalStrings.current
 
     val statusColor by animateColorAsState(
         targetValue = when (state.status) {
@@ -383,10 +381,10 @@ private fun StatusHeroCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = when (state.status) {
-                        ServiceStatus.Running  -> "Running"
-                        ServiceStatus.Starting -> "Starting…"
-                        ServiceStatus.Stopping -> "Stopping…"
-                        ServiceStatus.Stopped  -> "Stopped"
+                        ServiceStatus.Running  -> s.statusRunning
+                        ServiceStatus.Starting -> s.statusStarting
+                        ServiceStatus.Stopping -> s.statusStopping
+                        ServiceStatus.Stopped  -> s.statusStopped
                     },
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -426,7 +424,7 @@ private fun StatusHeroCard(
                 ) {
                     Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Start", style = MaterialTheme.typography.labelLarge)
+                    Text(s.start, style = MaterialTheme.typography.labelLarge)
                 }
 
                 // STOP — destructive outlined button
@@ -449,7 +447,7 @@ private fun StatusHeroCard(
                 ) {
                     Icon(Icons.Filled.Stop, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Stop", style = MaterialTheme.typography.labelLarge)
+                    Text(s.stop, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -495,7 +493,7 @@ private fun UrlChip(url: String, onCopy: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Filled.ContentCopy,
-                    contentDescription = "Copy URL",
+                    contentDescription = LocalStrings.current.copyUrl,
                     tint = cs.onSurfaceVariant,
                     modifier = Modifier.size(16.dp),
                 )
@@ -525,7 +523,7 @@ private fun QrCard(url: String) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Scan to open",
+                text = LocalStrings.current.scanToOpen,
                 style = MaterialTheme.typography.labelMedium,
                 color = cs.onSurfaceVariant,
             )
@@ -558,6 +556,7 @@ private fun PublicModeCard(
     onToggle: (Boolean) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(UiConstants.cardRadius),
@@ -569,18 +568,15 @@ private fun PublicModeCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Public Mode",
+                    text = s.publicMode,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = cs.onSurface,
                 )
                 // Status sub-text reflects the actual resolved IP so the user can confirm it works
                 val subtitle = when {
-                    publicMode && deviceIp != null ->
-                        "Reachable on your LAN at $deviceIp"
-                    publicMode && deviceIp == null ->
-                        "Could not detect a LAN IP — check your network"
-                    else ->
-                        "Listen on all interfaces; use device LAN IP in QR/URL"
+                    publicMode && deviceIp != null -> "${s.publicModeReachableAt} $deviceIp"
+                    publicMode && deviceIp == null -> s.publicModeNoIp
+                    else -> s.publicModeHint
                 }
                 Text(
                     text = subtitle,

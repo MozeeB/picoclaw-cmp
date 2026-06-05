@@ -14,12 +14,15 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mozeeb.picoclaw.cmp.i18n.LocalStrings
+import com.mozeeb.picoclaw.cmp.i18n.stringsFor
 import com.mozeeb.picoclaw.cmp.mvi.ServiceViewModel
 import com.mozeeb.picoclaw.cmp.ui.pages.ConfigPage
 import com.mozeeb.picoclaw.cmp.ui.pages.DashboardPage
@@ -32,13 +35,6 @@ data class NavDestination(
     val label: String,
     val icon: ImageVector,
     val selectedIcon: ImageVector,
-)
-
-private val destinations = listOf(
-    NavDestination("Dashboard", Icons.Outlined.Dashboard, Icons.Filled.Dashboard),
-    NavDestination("Web", Icons.Outlined.Language, Icons.Filled.Language),
-    NavDestination("Logs", Icons.AutoMirrored.Outlined.Article, Icons.AutoMirrored.Filled.Article),
-    NavDestination("Config", Icons.Outlined.Settings, Icons.Filled.Settings),
 )
 
 /** Config tab index — used for "Go to Config" navigation from the Dashboard banner. */
@@ -61,33 +57,43 @@ private fun AppContent(viewModel: ServiceViewModel) {
 
     var selectedIndex by remember { mutableIntStateOf(0) }
 
-    PicoClawTheme(mode = state.theme) {
-        AdaptiveNavBar(
-            destinations = destinations,
-            selectedIndex = selectedIndex,
-            onDestinationSelected = { selectedIndex = it },
-        ) {
-            AnimatedContent(
-                targetState = selectedIndex,
-                transitionSpec = {
-                    slideInVertically { h -> h } togetherWith slideOutVertically { h -> -h }
-                },
-                label = "page_transition",
-            ) { index ->
-                when (index) {
-                    0 -> DashboardPage(
-                        state = state,
-                        onIntent = viewModel::onIntent,
-                        onNavigateToConfig = { selectedIndex = CONFIG_TAB },
-                    )
-                    1 -> WebViewPage(state = state, onIntent = viewModel::onIntent)
-                    2 -> LogPage(state = state, onIntent = viewModel::onIntent)
-                    3 -> ConfigPage(state = state, onIntent = viewModel::onIntent)
-                    else -> DashboardPage(
-                        state = state,
-                        onIntent = viewModel::onIntent,
-                        onNavigateToConfig = { selectedIndex = CONFIG_TAB },
-                    )
+    val strings = stringsFor(state.locale)
+    val destinations = listOf(
+        NavDestination(strings.navDashboard, Icons.Outlined.Dashboard, Icons.Filled.Dashboard),
+        NavDestination(strings.navWeb, Icons.Outlined.Language, Icons.Filled.Language),
+        NavDestination(strings.navLogs, Icons.AutoMirrored.Outlined.Article, Icons.AutoMirrored.Filled.Article),
+        NavDestination(strings.navConfig, Icons.Outlined.Settings, Icons.Filled.Settings),
+    )
+
+    CompositionLocalProvider(LocalStrings provides strings) {
+        PicoClawTheme(mode = state.theme) {
+            AdaptiveNavBar(
+                destinations = destinations,
+                selectedIndex = selectedIndex,
+                onDestinationSelected = { selectedIndex = it },
+            ) {
+                AnimatedContent(
+                    targetState = selectedIndex,
+                    transitionSpec = {
+                        slideInVertically { h -> h } togetherWith slideOutVertically { h -> -h }
+                    },
+                    label = "page_transition",
+                ) { index ->
+                    when (index) {
+                        0 -> DashboardPage(
+                            state = state,
+                            onIntent = viewModel::onIntent,
+                            onNavigateToConfig = { selectedIndex = CONFIG_TAB },
+                        )
+                        1 -> WebViewPage(state = state, onIntent = viewModel::onIntent)
+                        2 -> LogPage(state = state, onIntent = viewModel::onIntent)
+                        3 -> ConfigPage(state = state, onIntent = viewModel::onIntent)
+                        else -> DashboardPage(
+                            state = state,
+                            onIntent = viewModel::onIntent,
+                            onNavigateToConfig = { selectedIndex = CONFIG_TAB },
+                        )
+                    }
                 }
             }
         }

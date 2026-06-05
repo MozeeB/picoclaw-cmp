@@ -44,6 +44,7 @@ fun WebViewPage(
 
 @Composable
 private fun StoppedPlaceholder(onStartService: () -> Unit) {
+    val s = com.mozeeb.picoclaw.cmp.i18n.LocalStrings.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -62,20 +63,20 @@ private fun StoppedPlaceholder(onStartService: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "Service is not running",
+                text = s.serviceNotRunning,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Start the PicoClaw service to access the web UI.",
+                text = s.webViewHint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
             Spacer(Modifier.height(24.dp))
             TextButton(onClick = onStartService) {
                 Text(
-                    "Start Service",
+                    s.startService,
                     color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.labelLarge,
                 )
