@@ -18,5 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CoreServiceAdapter` with binary validation and crash-safe service start.
 - Runtime binary downloader from GitHub releases (Desktop + Android), with Browse / Validate / Download UI.
 - Public mode: binds `0.0.0.0`, adds `-public`, auto-detects LAN IP for a scannable QR/URL, and persists.
+- **Desktop system tray** (Compose `Tray`): show/hide window, start/stop service, quit; minimize-to-tray on window close — tray and UI share one `ServiceViewModel`.
+- **Desktop window-state persistence**: window size & position are saved and restored across launches.
+- **Android auto-start on boot**: `BootReceiver` starts the foreground service after reboot when "Auto-start on launch" is enabled.
 
 [Unreleased]: https://github.com/MozeeB/picoclaw-cmp/commits/main

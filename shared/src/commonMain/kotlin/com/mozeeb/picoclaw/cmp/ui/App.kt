@@ -46,16 +46,17 @@ private const val CONFIG_TAB = 3
 
 /**
  * Root composable. Entry points must call [initKoin] before rendering this.
- * Uses [koinViewModel] from koin-compose-viewmodel (supports all KMP targets).
+ *
+ * By default the [ServiceViewModel] is resolved via [koinViewModel] (Android/iOS/Web).
+ * Desktop passes a shared instance so the system tray and the UI observe the same state.
  */
 @Composable
-fun App() {
-    AppContent()
+fun App(viewModel: ServiceViewModel = koinViewModel()) {
+    AppContent(viewModel)
 }
 
 @Composable
-private fun AppContent() {
-    val viewModel: ServiceViewModel = koinViewModel()
+private fun AppContent(viewModel: ServiceViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     var selectedIndex by remember { mutableIntStateOf(0) }

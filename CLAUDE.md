@@ -222,13 +222,18 @@ iosMain.dependencies    { implementation(libs.datastore.preferences) }
   - Desktop: opens in system browser (`java.awt.Desktop`)
   - iOS/Web: stub with TODO note
 
-### Phase 4 — Platform Polish (Pending)
-- [ ] Desktop: `java.awt.SystemTray` integration (minimize-to-tray, tray menu)
-- [ ] Desktop: window state persistence via DataStore
-- [ ] Android: `PicoClawService` foreground service + `BootReceiver`
+### Phase 4 — Platform Polish (In progress)
+- [x] Desktop: system tray (Compose `Tray`) — show/hide window, start/stop service, quit; minimize-to-tray on close
+- [x] Desktop: window size/position persistence via `WindowStateStore` (AppSettings/DataStore)
+- [x] Android: `PicoClawForegroundService` (Phase 2) + `BootReceiver` auto-start when `autoStart` enabled
 - [ ] Localization: 12-language string resources in `composeResources/values-*/`
 - [ ] Firebase Analytics stub (androidMain actual, no-op on other platforms)
 - [ ] iOS: WKWebView integration in `PlatformWebView.ios.kt`
+
+> **Desktop tray + UI share one `ServiceViewModel`.** `App(viewModel = koinViewModel())` accepts an
+> injected VM; the desktop entry point constructs it once (`ServiceViewModel(koin.get(), koin.get(), koin.get())`)
+> and passes it to both the `Tray` and the `Window` so tray-initiated start/stop stays in sync with the UI.
+> `jvm initKoin()` returns the `Koin` instance for this.
 
 ---
 

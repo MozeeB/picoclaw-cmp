@@ -18,6 +18,10 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+
+    // BootReceiver resolves SettingsRepository / CoreServiceAdapter from Koin's GlobalContext
+    implementation(libs.koin.android)
+    implementation(libs.kotlinx.coroutinesCore)
 }
 
 android {
