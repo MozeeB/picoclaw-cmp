@@ -314,6 +314,18 @@ class ServiceViewModelTest {
         assertEquals("127.0.0.1", vm.state.value.bindHost)
     }
 
+    @Test
+    fun given_publicModeOn_then_localWebUrlUsesLoopback() = runTest {
+        // The embedded WebView must hit loopback (cleartext-permitted), not the LAN IP
+        val (vm, _) = makeViewModel()
+        advanceUntilIdle()
+        vm.onIntent(ServiceIntent.UpdatePort(18800))
+        vm.onIntent(ServiceIntent.TogglePublicMode(true))
+        advanceUntilIdle()
+        val url = vm.state.value.localWebUrl
+        assertTrue(url.startsWith("http://127.0.0.1:18800"), "Expected loopback URL, got: $url")
+    }
+
     // -------------------------------------------------------------------------
     // Logs
     // -------------------------------------------------------------------------

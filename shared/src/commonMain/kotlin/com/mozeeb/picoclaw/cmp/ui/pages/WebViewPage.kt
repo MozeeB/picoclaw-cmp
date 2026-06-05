@@ -37,7 +37,8 @@ fun WebViewPage(
     if (state.status != ServiceStatus.Running) {
         StoppedPlaceholder(onStartService = { onIntent(ServiceIntent.StartService) })
     } else {
-        PlatformWebView(url = state.webUrl, modifier = Modifier.fillMaxSize())
+        // Embedded WebView always targets loopback (cleartext-permitted on Android)
+        PlatformWebView(url = state.localWebUrl, modifier = Modifier.fillMaxSize())
     }
 }
 

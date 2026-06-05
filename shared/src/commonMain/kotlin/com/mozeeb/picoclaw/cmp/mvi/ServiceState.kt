@@ -60,11 +60,24 @@ data class ServiceState(
     val displayHost: String
         get() = if (publicMode) (deviceIp ?: host) else host
 
-    /** URL to open in the embedded WebView and display as QR code. */
+    /** URL shown to the user / encoded in the QR code (LAN IP in public mode). */
     val webUrl: String
         get() = buildString {
             append("http://")
             append(displayHost)
+            append(":$port")
+            if (path.isNotEmpty() && path != "/") append(path)
+        }
+
+    /**
+     * URL the *embedded* WebView loads. Always targets the loopback host on this device —
+     * the service binds `0.0.0.0` in public mode, so `127.0.0.1` is always reachable locally,
+     * and Android's network-security-config permits cleartext only to loopback.
+     */
+    val localWebUrl: String
+        get() = buildString {
+            append("http://")
+            append(if (publicMode) "127.0.0.1" else host)
             append(":$port")
             if (path.isNotEmpty() && path != "/") append(path)
         }

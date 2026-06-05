@@ -22,4 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Desktop window-state persistence**: window size & position are saved and restored across launches.
 - **Android auto-start on boot**: `BootReceiver` starts the foreground service after reboot when "Auto-start on launch" is enabled.
 
+### Fixed
+- **Android WebView `ERR_CLEARTEXT_NOT_PERMITTED`**: added a network-security-config permitting
+  cleartext to loopback, and the embedded WebView now loads the loopback URL (`127.0.0.1`) — the
+  local service is always reachable there, even in public mode. The LAN IP is still used for the QR/URL.
+
 [Unreleased]: https://github.com/MozeeB/picoclaw-cmp/commits/main
