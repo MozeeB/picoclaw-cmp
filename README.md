@@ -49,7 +49,7 @@ PicoClaw service — a local network reverse proxy / tunnelling daemon — with 
 |---------|:-------:|:-------------:|:---:|:---:|
 | Service start/stop | ✅ foreground service | ✅ process spawn | — stub | — stub |
 | Binary download | ✅ | ✅ | — | — |
-| WebView | ✅ native | ✅ system browser | ⏳ Phase 4 | ⏳ Phase 4 |
+| WebView | ✅ native | ✅ system browser | ✅ `WKWebView` | — stub |
 | Settings persistence | ✅ DataStore | ✅ DataStore | ✅ DataStore | in-memory |
 | QR code | ✅ | ✅ | ✅ | ✅ |
 
