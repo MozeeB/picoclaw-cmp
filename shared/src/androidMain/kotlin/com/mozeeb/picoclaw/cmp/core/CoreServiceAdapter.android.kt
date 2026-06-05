@@ -143,8 +143,12 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
     // -------------------------------------------------------------------------
 
     /**
-     * Build the ordered list of paths to check. The web-console binary (launcher / -web) is
-     * preferred — the bare gateway can't serve the web UI. Gateway is only a last-resort fallback.
+     * Build the ordered list of paths to check.
+     *
+     * IMPORTANT: Android 10+ (API 29) forbids executing binaries from the app's writable
+     * data dir (filesDir) — only [nativeLibraryDir] (jniLibs, read-only) is executable.
+     * So the **bundled** web binary is preferred; downloaded copies in filesDir are last-resort
+     * (they only run on older Android). The web-console binary is preferred over the gateway.
      */
     private fun buildCandidateList(customPath: String): List<String> = buildList {
         val nativeDir = context.applicationInfo.nativeLibraryDir
@@ -153,17 +157,21 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
         // 1. User-configured path (highest priority)
         if (customPath.isNotBlank()) add(File(customPath).absolutePath)
 
-        // 2. Web-console binaries (serve the UI) — downloaded (desktop + lib naming), then bundled
+        // 2. Bundled web-console binary in nativeLibraryDir — EXECUTABLE + serves the UI (best)
+        add(File(nativeDir, WEB_BINARY_NAME).absolutePath)          // libpicoclaw-web.so
+
+        // 3. Downloaded web binaries (only executable on Android < 10)
         add(File(binDir, "picoclaw-launcher").absolutePath)
         add(File(binDir, "picoclaw-web").absolutePath)
-        add(File(binDir, WEB_BINARY_NAME).absolutePath)             // downloaded libpicoclaw-web.so
-        add(File(nativeDir, WEB_BINARY_NAME).absolutePath)          // bundled libpicoclaw-web.so
+        add(File(binDir, WEB_BINARY_NAME).absolutePath)
         add(context.filesDir.resolve(WEB_BINARY_NAME).absolutePath)
 
-        // 3. Gateway fallbacks (won't serve the web UI, but better than nothing)
+        // 4. Bundled gateway (executable, but can't serve the web UI → "unknown command")
+        add(File(nativeDir, BINARY_NAME).absolutePath)              // libpicoclaw.so
+
+        // 5. Downloaded gateway fallbacks
         add(File(binDir, "picoclaw").absolutePath)
-        add(File(binDir, BINARY_NAME).absolutePath)                 // downloaded libpicoclaw.so
-        add(File(nativeDir, BINARY_NAME).absolutePath)              // bundled libpicoclaw.so
+        add(File(binDir, BINARY_NAME).absolutePath)
         add(context.filesDir.resolve(BINARY_NAME).absolutePath)
     }.distinct()
 

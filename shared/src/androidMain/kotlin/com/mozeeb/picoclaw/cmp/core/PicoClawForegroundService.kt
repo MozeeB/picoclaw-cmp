@@ -142,8 +142,16 @@ class PicoClawForegroundService : Service() {
                 Log.i(TAG, "Process exited: code=$exitCode")
                 updateNotification("PicoClaw — stopped (exit $exitCode)")
             }.onFailure { e ->
-                Log.e(TAG, "Service error: ${e.message}", e)
-                updateNotification("Error: ${e.message?.take(60)}")
+                val msg = e.message.orEmpty()
+                val friendly = if (msg.contains("error=13") || msg.contains("Permission denied")) {
+                    // Android 10+ blocks executing binaries from the app's writable data dir.
+                    "Android can't execute downloaded binaries. Bundle the picoclaw web binary as " +
+                        "androidApp/src/main/jniLibs/<abi>/libpicoclaw-web.so and rebuild."
+                } else {
+                    "Error: ${msg.take(80)}"
+                }
+                Log.e(TAG, "Service error: $msg", e)
+                updateNotification(friendly)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
