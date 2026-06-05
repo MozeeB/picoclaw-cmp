@@ -29,9 +29,11 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
 
     companion object {
         private const val TAG = "PicoClawAdapter"
-        /** Native library name as packaged in jniLibs/ (bundled gateway). */
+        /** Bundled gateway, packaged in jniLibs/ (Cobra CLI — does NOT serve the web UI). */
         const val BINARY_NAME = "libpicoclaw.so"
-        /** Subdirectory of filesDir where downloaded executables (gateway + launcher) are installed. */
+        /** Bundled web-console binary, packaged in jniLibs/ (serves the management web UI). */
+        const val WEB_BINARY_NAME = "libpicoclaw-web.so"
+        /** Subdirectory of filesDir where downloaded executables are installed. */
         const val BIN_DIR = "picoclaw-bin"
     }
 
@@ -140,20 +142,26 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
     // Private helpers
     // -------------------------------------------------------------------------
 
-    /** Build the ordered list of paths to check. Prefers the web-console launcher. */
+    /**
+     * Build the ordered list of paths to check. The web-console binary (launcher / -web) is
+     * preferred — the bare gateway can't serve the web UI. Gateway is only a last-resort fallback.
+     */
     private fun buildCandidateList(customPath: String): List<String> = buildList {
+        val nativeDir = context.applicationInfo.nativeLibraryDir
+        val binDir = context.filesDir.resolve(BIN_DIR)
+
         // 1. User-configured path (highest priority)
         if (customPath.isNotBlank()) add(File(customPath).absolutePath)
 
-        // 2. Downloaded executables in filesDir/picoclaw-bin — launcher first, then gateway
-        val binDir = context.filesDir.resolve(BIN_DIR)
+        // 2. Web-console binaries (serve the UI) — downloaded launcher, then bundled web binary
         add(File(binDir, "picoclaw-launcher").absolutePath)
+        add(File(binDir, "picoclaw-web").absolutePath)
+        add(File(nativeDir, WEB_BINARY_NAME).absolutePath)          // libpicoclaw-web.so
+        add(context.filesDir.resolve(WEB_BINARY_NAME).absolutePath)
+
+        // 3. Gateway fallbacks (won't serve the web UI, but better than nothing)
         add(File(binDir, "picoclaw").absolutePath)
-
-        // 3. nativeLibraryDir — Android auto-extracts jniLibs/ here on install (bundled gateway)
-        add(File(context.applicationInfo.nativeLibraryDir, BINARY_NAME).absolutePath)
-
-        // 4. filesDir — APK-extracted bundled gateway (TV / unusual devices)
+        add(File(nativeDir, BINARY_NAME).absolutePath)              // libpicoclaw.so
         add(context.filesDir.resolve(BINARY_NAME).absolutePath)
     }.distinct()
 

@@ -74,8 +74,8 @@ class PicoClawForegroundService : Service() {
         processJob?.cancel()
         processJob = scope.launch {
             runCatching {
-                val binary = File(binaryPath)
-                if (!binary.exists() || !binary.canExecute()) {
+                val webBinary = File(binaryPath)
+                if (!webBinary.exists() || !webBinary.canExecute()) {
                     updateNotification("Error: binary not found at $binaryPath")
                     Log.e(TAG, "Binary not found or not executable: $binaryPath")
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -83,12 +83,37 @@ class PicoClawForegroundService : Service() {
                     return@launch
                 }
 
-                // Build command — mirrors picoclaw_fui: `<binary> -port <port> [args]`.
-                // No --host/--path flags; public mode is signalled via -public in extraArgs.
+                val picoHome = File(filesDir, "picoclaw").also { it.mkdirs() }
+                val configFile = File(picoHome, "config.json")
+                // The web/launcher binary spawns the gateway, so PICOCLAW_BINARY must point at it.
+                val gateway = resolveGatewayBinary()
+                val env = buildEnv(picoHome, gateway?.absolutePath ?: binaryPath)
+
+                // Onboard once (creates config.json) using the gateway — mirrors Flutter.
+                if (!configFile.exists() && gateway != null) {
+                    Log.i(TAG, "Onboarding (creating config.json)…")
+                    updateNotification("PicoClaw — initializing…")
+                    runCatching {
+                        val ob = ProcessBuilder(gateway.absolutePath, "onboard")
+                            .directory(filesDir).redirectErrorStream(true)
+                        ob.environment().putAll(env)
+                        val p = ob.start()
+                        p.inputStream.bufferedReader().forEachLine { Log.d(TAG, it) }
+                        p.waitFor()
+                    }.onFailure { Log.w(TAG, "onboard failed: ${it.message}") }
+                }
+
+                // Build command. The web-console binary needs `--console --no-browser` + config path
+                // (mirrors picoclaw_fui's PicoClawService); the launcher just needs `-port`.
+                // Public mode is signalled via -public in extraArgs.
+                val base = webBinary.name.lowercase()
+                val isWebBinary = base.contains("web")
                 val cmd = buildList {
                     add(binaryPath)
+                    if (isWebBinary) { add("--console"); add("--no-browser") }
                     add("-port"); add(port.toString())
                     if (extraArgs.isNotBlank()) addAll(extraArgs.trim().split("\\s+".toRegex()))
+                    if (isWebBinary && configFile.exists()) add(configFile.absolutePath)
                 }
 
                 Log.i(TAG, "Starting: ${cmd.joinToString(" ")}")
@@ -97,20 +122,7 @@ class PicoClawForegroundService : Service() {
                 val pb = ProcessBuilder(cmd)
                     .directory(filesDir)
                     .redirectErrorStream(true)
-
-                // Set environment variables (mirrors Flutter's buildEnvironment())
-                pb.environment().also { env ->
-                    val picoHome = File(filesDir, "picoclaw").also { it.mkdirs() }
-                    val tmpDir   = File(cacheDir, "tmp").also { it.mkdirs() }
-                    env["HOME"]             = filesDir.absolutePath
-                    env["PICOCLAW_HOME"]    = picoHome.absolutePath
-                    env["PICOCLAW_CONFIG"]  = File(picoHome, "config.json").absolutePath
-                    env["PICOCLAW_BINARY"]  = binaryPath
-                    env["TMPDIR"]           = tmpDir.absolutePath
-                    env["PATH"]             = "/system/bin:/system/xbin"
-                    env["LANG"]             = "en_US.UTF-8"
-                    env["SSL_CERT_DIR"]     = "/system/etc/security/cacerts"
-                }
+                pb.environment().putAll(env)
 
                 process = pb.start()
 
@@ -136,6 +148,31 @@ class PicoClawForegroundService : Service() {
                 stopSelf()
             }
         }
+    }
+
+    /** Resolve the gateway binary (libpicoclaw.so / downloaded picoclaw) for onboarding + env. */
+    private fun resolveGatewayBinary(): File? {
+        val nativeDir = applicationInfo.nativeLibraryDir
+        return listOf(
+            File(filesDir, "${AndroidCoreServiceAdapter.BIN_DIR}/picoclaw"),
+            File(nativeDir, AndroidCoreServiceAdapter.BINARY_NAME),     // libpicoclaw.so
+            File(filesDir, AndroidCoreServiceAdapter.BINARY_NAME),
+        ).firstOrNull { it.exists() && it.canExecute() }
+    }
+
+    /** Environment for the picoclaw process (mirrors picoclaw_fui buildEnvironment). */
+    private fun buildEnv(picoHome: File, gatewayPath: String): Map<String, String> {
+        val tmpDir = File(cacheDir, "tmp").also { it.mkdirs() }
+        return mapOf(
+            "HOME" to filesDir.absolutePath,
+            "PICOCLAW_HOME" to picoHome.absolutePath,
+            "PICOCLAW_CONFIG" to File(picoHome, "config.json").absolutePath,
+            "PICOCLAW_BINARY" to gatewayPath,
+            "TMPDIR" to tmpDir.absolutePath,
+            "PATH" to "/system/bin:/system/xbin",
+            "LANG" to "en_US.UTF-8",
+            "SSL_CERT_DIR" to "/system/etc/security/cacerts",
+        )
     }
 
     // -------------------------------------------------------------------------
