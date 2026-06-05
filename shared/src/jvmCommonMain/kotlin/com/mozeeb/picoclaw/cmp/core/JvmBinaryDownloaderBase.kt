@@ -95,16 +95,17 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
         }
 
     /**
-     * Pick which installed binary to run. The web-console **launcher** is preferred —
-     * the bare `picoclaw` binary is a Cobra agent/gateway CLI and does NOT serve the web UI
-     * (running it with `-port` fails with `unknown command`).
+     * Pick which installed binary to run. The web-console binary (launcher / -web) is preferred —
+     * the bare `picoclaw` gateway is a Cobra CLI and does NOT serve the web UI (running it with
+     * `-port` fails with `unknown command`). Handles both desktop names (picoclaw-launcher) and
+     * Android names (libpicoclaw-web.so).
      */
     private fun pickPrimaryBinary(dir: File, names: Set<String>): File {
-        val preference = listOf(
-            "picoclaw-launcher", "picoclaw-launcher.exe",
-            "picoclaw", "picoclaw.exe",
-        )
-        val chosen = preference.firstOrNull { it in names } ?: names.first()
+        fun find(pred: (String) -> Boolean) = names.firstOrNull { pred(it.lowercase()) }
+        val chosen = find { it.contains("launcher") }
+            ?: find { it.contains("web") }
+            ?: find { it.contains("picoclaw") }
+            ?: names.first()
         return File(dir, chosen)
     }
 
@@ -217,13 +218,18 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
 
     private fun extractFromZip(archive: File): Map<String, ByteArray> {
         val out = LinkedHashMap<String, ByteArray>()
+        val chosenPath = HashMap<String, String>() // basename -> path we kept
         ZipInputStream(archive.inputStream().buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (entry.isDirectory) continue
-                val base = entry.name.substringAfterLast('/').substringAfterLast('\\')
+                val path = entry.name
+                val base = path.substringAfterLast('/').substringAfterLast('\\')
                 val bytes = zip.readBytes()
-                if (isExecutableCandidate(base)) out[base] = bytes
+                if (isExecutableCandidate(base) && shouldKeep(chosenPath[base], path)) {
+                    out[base] = bytes
+                    chosenPath[base] = path
+                }
             }
         }
         return out
@@ -234,6 +240,7 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
         val stream = BufferedInputStream(input)
         val header = ByteArray(512)
         val out = LinkedHashMap<String, ByteArray>()
+        val chosenPath = HashMap<String, String>()
 
         while (true) {
             if (!readFully(stream, header)) break
@@ -255,13 +262,19 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
             // Regular file? typeFlag '0' (or NUL for old archives)
             if (typeFlag == '0' || typeFlag == ' ') {
                 val base = name.substringAfterLast('/').substringAfterLast('\\')
-                if (isExecutableCandidate(base)) out[base] = body
+                if (isExecutableCandidate(base) && shouldKeep(chosenPath[base], name)) {
+                    out[base] = body
+                    chosenPath[base] = name
+                }
             }
         }
         return out
     }
 
-    /** True for picoclaw executables (gateway + launcher); excludes text/metadata files. */
+    /**
+     * True for picoclaw executables; excludes text/metadata files. Matches both desktop names
+     * (`picoclaw`, `picoclaw-launcher`) and Android names (`libpicoclaw.so`, `libpicoclaw-web.so`).
+     */
     private fun isExecutableCandidate(baseName: String): Boolean {
         val base = baseName.lowercase()
         if (base.isEmpty()) return false
@@ -269,7 +282,25 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
             base.endsWith(".sha256") || base.endsWith(".sig") || base.endsWith(".yaml") ||
             base.endsWith(".yml") || base.endsWith(".toml")
         ) return false
-        return base.startsWith("picoclaw")
+        return base.contains("picoclaw")
+    }
+
+    /**
+     * For "universal" archives that carry the same basename under multiple arch directories,
+     * keep the copy whose path matches the device arch (replace a non-matching earlier pick).
+     */
+    private fun shouldKeep(currentPath: String?, candidatePath: String): Boolean {
+        if (currentPath == null) return true
+        return !pathMatchesArch(currentPath) && pathMatchesArch(candidatePath)
+    }
+
+    private fun pathMatchesArch(path: String): Boolean {
+        val p = path.lowercase()
+        return when (arch) {
+            "arm64" -> p.contains("arm64") || p.contains("aarch64")
+            "x86_64" -> p.contains("x86_64") || p.contains("amd64") || p.contains("x64")
+            else -> false
+        }
     }
 
     // -------------------------------------------------------------------------

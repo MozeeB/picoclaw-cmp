@@ -153,15 +153,17 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
         // 1. User-configured path (highest priority)
         if (customPath.isNotBlank()) add(File(customPath).absolutePath)
 
-        // 2. Web-console binaries (serve the UI) — downloaded launcher, then bundled web binary
+        // 2. Web-console binaries (serve the UI) — downloaded (desktop + lib naming), then bundled
         add(File(binDir, "picoclaw-launcher").absolutePath)
         add(File(binDir, "picoclaw-web").absolutePath)
-        add(File(nativeDir, WEB_BINARY_NAME).absolutePath)          // libpicoclaw-web.so
+        add(File(binDir, WEB_BINARY_NAME).absolutePath)             // downloaded libpicoclaw-web.so
+        add(File(nativeDir, WEB_BINARY_NAME).absolutePath)          // bundled libpicoclaw-web.so
         add(context.filesDir.resolve(WEB_BINARY_NAME).absolutePath)
 
         // 3. Gateway fallbacks (won't serve the web UI, but better than nothing)
         add(File(binDir, "picoclaw").absolutePath)
-        add(File(nativeDir, BINARY_NAME).absolutePath)              // libpicoclaw.so
+        add(File(binDir, BINARY_NAME).absolutePath)                 // downloaded libpicoclaw.so
+        add(File(nativeDir, BINARY_NAME).absolutePath)              // bundled libpicoclaw.so
         add(context.filesDir.resolve(BINARY_NAME).absolutePath)
     }.distinct()
 
