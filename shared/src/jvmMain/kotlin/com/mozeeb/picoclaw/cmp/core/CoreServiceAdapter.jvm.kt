@@ -65,11 +65,12 @@ class DesktopCoreServiceAdapter : CoreServiceAdapter {
         }
         val resolvedBinary = (validation as BinaryValidation.Ok).resolvedPath
 
+        // Invocation mirrors picoclaw_fui's desktop adapter: `<binary> -port <port> [args]`.
+        // The binary serves the web console by default; public mode is signalled via the
+        // `-public` flag (already folded into extraArgs by the ViewModel), NOT a --host flag.
         val cmd = buildList {
             add(resolvedBinary)
-            add("--host"); add(host)
-            add("--port"); add(port.toString())
-            if (path.isNotBlank() && path != "/") { add("--path"); add(path) }
+            add("-port"); add(port.toString())
             if (extraArgs.isNotBlank()) addAll(extraArgs.trim().split("\\s+".toRegex()))
         }
 

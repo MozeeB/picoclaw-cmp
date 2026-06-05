@@ -67,9 +67,7 @@ class PicoClawForegroundService : Service() {
     // -------------------------------------------------------------------------
 
     private fun handleStart(intent: Intent) {
-        val host       = intent.getStringExtra(EXTRA_HOST)   ?: "127.0.0.1"
         val port       = intent.getIntExtra(EXTRA_PORT, 18800)
-        val path       = intent.getStringExtra(EXTRA_PATH)   ?: "/"
         val binaryPath = intent.getStringExtra(EXTRA_BINARY) ?: ""
         val extraArgs  = intent.getStringExtra(EXTRA_ARGS)   ?: ""
 
@@ -85,17 +83,16 @@ class PicoClawForegroundService : Service() {
                     return@launch
                 }
 
-                // Build command — mirrors Flutter's PicoClawService.runWebService()
+                // Build command — mirrors picoclaw_fui: `<binary> -port <port> [args]`.
+                // No --host/--path flags; public mode is signalled via -public in extraArgs.
                 val cmd = buildList {
                     add(binaryPath)
-                    add("--host"); add(host)
-                    add("--port"); add(port.toString())
-                    if (path.isNotBlank() && path != "/") { add("--path"); add(path) }
+                    add("-port"); add(port.toString())
                     if (extraArgs.isNotBlank()) addAll(extraArgs.trim().split("\\s+".toRegex()))
                 }
 
                 Log.i(TAG, "Starting: ${cmd.joinToString(" ")}")
-                updateNotification("PicoClaw — running on $host:$port")
+                updateNotification("PicoClaw — running on port $port")
 
                 val pb = ProcessBuilder(cmd)
                     .directory(filesDir)

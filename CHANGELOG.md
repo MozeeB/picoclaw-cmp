@@ -29,5 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Android WebView `ERR_CLEARTEXT_NOT_PERMITTED`**: added a network-security-config permitting
   cleartext to loopback, and the embedded WebView now loads the loopback URL (`127.0.0.1`) — the
   local service is always reachable there, even in public mode. The LAN IP is still used for the QR/URL.
+- **WebView `ERR_CONNECTION_REFUSED`**: the binary is now launched as `<binary> -port <port> [args]`
+  (matching picoclaw_fui) instead of with made-up `--host`/`--path` flags that prevented it from
+  binding the port. The embedded Android WebView also auto-retries the initial load to cover the
+  brief window between process start and the server binding the port.
 
 [Unreleased]: https://github.com/MozeeB/picoclaw-cmp/commits/main

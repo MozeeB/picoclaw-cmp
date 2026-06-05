@@ -573,6 +573,13 @@ if (validation is BinaryValidation.NotFound) throw BinaryNotFoundException(valid
 ProcessBuilder(cmd).start()  // crashes if binary missing
 ```
 
+### ⚠️ Binary invocation format (must match picoclaw_fui)
+Launch the binary as **`<binary> -port <port> [extraArgs]`** — single-dash `-port`, no
+`--host`/`--path` flags (the real CLI rejects those, so the server never binds → the WebView shows
+`ERR_CONNECTION_REFUSED`). Public mode appends `-public` to the args (via `buildEffectiveArgs`),
+which is how the binary listens on all interfaces. The embedded WebView always targets loopback
+and auto-retries the first load to cover the start-to-bind window.
+
 ### Validation chain
 1. `ServiceViewModel.startService()` calls `adapter.validateBinary()` before `adapter.start()`
 2. `adapter.start()` re-validates internally (second safety net)
