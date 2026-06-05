@@ -122,9 +122,13 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
         runCatching {
             NetworkInterface.getNetworkInterfaces()
                 ?.asSequence()
-                ?.filter { it.isUp && !it.isLoopback }
+                ?.filter { it.isUp && !it.isLoopback && !it.isVirtual }
                 ?.flatMap { it.inetAddresses.asSequence() }
                 ?.filterIsInstance<Inet4Address>()
+                // Skip loopback and link-local / APIPA (169.254.x.x) — not reachable on the LAN
+                ?.filter { !it.isLoopbackAddress && !it.isLinkLocalAddress }
+                // Prefer real private LAN addresses (192.168/10/172.16-31)
+                ?.sortedByDescending { it.isSiteLocalAddress }
                 ?.firstOrNull()
                 ?.hostAddress
         }.getOrNull()

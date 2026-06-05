@@ -116,9 +116,13 @@ class DesktopCoreServiceAdapter : CoreServiceAdapter {
         try {
             java.net.NetworkInterface.getNetworkInterfaces()
                 ?.asSequence()
-                ?.filter { it.isUp && !it.isLoopback }
+                ?.filter { it.isUp && !it.isLoopback && !it.isVirtual }
                 ?.flatMap { it.inetAddresses.asSequence() }
                 ?.filterIsInstance<java.net.Inet4Address>()
+                // Skip loopback (127.x) and link-local / APIPA (169.254.x.x) — not reachable on the LAN
+                ?.filter { !it.isLoopbackAddress && !it.isLinkLocalAddress }
+                // Prefer real private LAN addresses (192.168/10/172.16-31) over anything else
+                ?.sortedByDescending { it.isSiteLocalAddress }
                 ?.firstOrNull()
                 ?.hostAddress
         } catch (e: Exception) {
