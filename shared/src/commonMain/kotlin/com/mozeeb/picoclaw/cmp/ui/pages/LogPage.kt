@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -151,8 +150,10 @@ fun LogPage(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                items(filteredLogs, key = { it.hashCode() }) { line ->
-                    LogEntry(line = line)
+                // Key by index — log lines are often duplicated, so content-based keys
+                // (e.g. hashCode) would collide and crash LazyColumn.
+                items(count = filteredLogs.size, key = { index -> index }) { index ->
+                    LogEntry(line = filteredLogs[index])
                 }
             }
         }
