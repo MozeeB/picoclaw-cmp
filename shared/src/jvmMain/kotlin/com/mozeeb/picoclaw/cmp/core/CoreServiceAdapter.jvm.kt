@@ -137,37 +137,36 @@ class DesktopCoreServiceAdapter : CoreServiceAdapter {
     private fun resolveCandidates(customPath: String): List<String> {
         val os = System.getProperty("os.name", "").lowercase()
         val isWindows = os.contains("win")
-        val binaryName = if (isWindows) "picoclaw.exe" else "picoclaw"
+        val ext = if (isWindows) ".exe" else ""
+        // Prefer the web-console launcher over the bare gateway CLI (which can't serve the web UI).
+        val names = listOf("picoclaw-launcher$ext", "picoclaw$ext")
         val home = System.getProperty("user.home", ".")
         val cwd = System.getProperty("user.dir", ".")
 
-        return buildList {
-            // 1. User-configured path (exact)
-            if (customPath.isNotBlank()) add(File(customPath).absolutePath)
-
-            // 2. ~/.picoclaw/bin/picoclaw[.exe]
-            add(File(home, ".picoclaw/bin/$binaryName").absolutePath)
-
-            // 3. ./bin/picoclaw[.exe]  (next to JAR / working dir)
-            add(File(cwd, "bin/$binaryName").absolutePath)
-
-            // 4. ./picoclaw[.exe]  (current working dir)
-            add(File(cwd, binaryName).absolutePath)
-
-            // 5. Executable's directory (for packaged apps)
+        // Directories to search, in priority order
+        val dirs = buildList {
+            add(File(home, ".picoclaw/bin"))
+            add(File(cwd, "bin"))
+            add(File(cwd))
             runCatching {
-                val exePath = File(ProcessHandle.current().info().command().orElse("")).parentFile
-                if (exePath != null && exePath.exists()) {
-                    add(File(exePath, binaryName).absolutePath)
-                    add(File(exePath, "bin/$binaryName").absolutePath)
+                File(ProcessHandle.current().info().command().orElse("")).parentFile?.let {
+                    add(it)
+                    add(File(it, "bin"))
                 }
             }
-
-            // 6. System PATH
             (System.getenv("PATH") ?: "")
                 .split(if (isWindows) ";" else ":")
                 .filter { it.isNotBlank() }
-                .forEach { dir -> add(File(dir, binaryName).absolutePath) }
+                .forEach { add(File(it)) }
+        }
+
+        return buildList {
+            // 1. User-configured path (exact) — highest priority
+            if (customPath.isNotBlank()) add(File(customPath).absolutePath)
+            // 2. launcher first, then gateway, across every search directory
+            for (name in names) {
+                for (dir in dirs) add(File(dir, name).absolutePath)
+            }
         }.distinct()
     }
 }

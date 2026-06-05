@@ -29,8 +29,10 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
 
     companion object {
         private const val TAG = "PicoClawAdapter"
-        /** Native library name as packaged in jniLibs/. */
+        /** Native library name as packaged in jniLibs/ (bundled gateway). */
         const val BINARY_NAME = "libpicoclaw.so"
+        /** Subdirectory of filesDir where downloaded executables (gateway + launcher) are installed. */
+        const val BIN_DIR = "picoclaw-bin"
     }
 
     private val _logFlow = MutableSharedFlow<String>(extraBufferCapacity = 1000)
@@ -138,15 +140,20 @@ class AndroidCoreServiceAdapter(private val context: Context) : CoreServiceAdapt
     // Private helpers
     // -------------------------------------------------------------------------
 
-    /** Build the ordered list of paths to check (mirrors Flutter's resolution order). */
+    /** Build the ordered list of paths to check. Prefers the web-console launcher. */
     private fun buildCandidateList(customPath: String): List<String> = buildList {
         // 1. User-configured path (highest priority)
         if (customPath.isNotBlank()) add(File(customPath).absolutePath)
 
-        // 2. nativeLibraryDir — Android auto-extracts jniLibs/ here on install
+        // 2. Downloaded executables in filesDir/picoclaw-bin — launcher first, then gateway
+        val binDir = context.filesDir.resolve(BIN_DIR)
+        add(File(binDir, "picoclaw-launcher").absolutePath)
+        add(File(binDir, "picoclaw").absolutePath)
+
+        // 3. nativeLibraryDir — Android auto-extracts jniLibs/ here on install (bundled gateway)
         add(File(context.applicationInfo.nativeLibraryDir, BINARY_NAME).absolutePath)
 
-        // 3. filesDir — where we manually extract from APK on TV/unusual devices
+        // 4. filesDir — APK-extracted bundled gateway (TV / unusual devices)
         add(context.filesDir.resolve(BINARY_NAME).absolutePath)
     }.distinct()
 

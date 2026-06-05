@@ -5,8 +5,8 @@ import java.io.File
 /**
  * Desktop (JVM) binary downloader.
  *
- * Installs to `~/.picoclaw/bin/picoclaw[.exe]` — the first location the
- * [DesktopCoreServiceAdapter] checks during binary resolution.
+ * Installs all executables (gateway + launcher) into `~/.picoclaw/bin/` — the first
+ * location the [DesktopCoreServiceAdapter] checks during binary resolution.
  */
 class DesktopBinaryDownloader : JvmBinaryDownloaderBase() {
 
@@ -28,10 +28,9 @@ class DesktopBinaryDownloader : JvmBinaryDownloaderBase() {
         }
     }
 
-    override fun installTargetFile(): File {
+    override fun installDir(): File {
         val home = System.getProperty("user.home") ?: "."
-        val binaryName = if (isWindows) "picoclaw.exe" else "picoclaw"
-        return File(home, ".picoclaw/bin/$binaryName")
+        return File(home, ".picoclaw/bin")
     }
 
     override fun markExecutable(file: File) {

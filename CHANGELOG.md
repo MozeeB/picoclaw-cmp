@@ -33,5 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (matching picoclaw_fui) instead of with made-up `--host`/`--path` flags that prevented it from
   binding the port. The embedded Android WebView also auto-retries the initial load to cover the
   brief window between process start and the server binding the port.
+- **WebView still refused (`unknown command "18800"`)**: the release ships two binaries — `picoclaw`
+  (agent/gateway CLI, which can't serve the web UI) and `picoclaw-launcher` (which does). The
+  downloader now extracts **both** and binary resolution **prefers `picoclaw-launcher`**, so the
+  web console actually starts. Re-download the binary (or point Config at `picoclaw-launcher`) to apply.
+- **Device IP**: public mode no longer reports a link-local APIPA address (`169.254.x.x`); it now
+  prefers a real private LAN IP.
 
 [Unreleased]: https://github.com/MozeeB/picoclaw-cmp/commits/main

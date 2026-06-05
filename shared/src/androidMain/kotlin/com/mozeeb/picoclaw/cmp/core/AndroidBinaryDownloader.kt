@@ -7,8 +7,8 @@ import java.io.File
 /**
  * Android binary downloader.
  *
- * Installs to `filesDir/libpicoclaw.so` — the location the
- * [AndroidCoreServiceAdapter] checks after nativeLibraryDir.
+ * Installs all executables (gateway + launcher) into `filesDir/picoclaw-bin/` — the
+ * [AndroidCoreServiceAdapter] checks this directory (preferring the launcher) after nativeLibraryDir.
  */
 class AndroidBinaryDownloader(
     private val context: Context,
@@ -25,8 +25,7 @@ class AndroidBinaryDownloader(
         }
     }
 
-    override fun installTargetFile(): File =
-        context.filesDir.resolve(AndroidCoreServiceAdapter.BINARY_NAME) // libpicoclaw.so
+    override fun installDir(): File = context.filesDir.resolve(AndroidCoreServiceAdapter.BIN_DIR)
 
     override fun markExecutable(file: File) {
         file.setExecutable(true, false)

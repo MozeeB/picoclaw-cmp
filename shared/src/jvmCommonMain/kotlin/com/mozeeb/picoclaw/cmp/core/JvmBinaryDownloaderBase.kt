@@ -21,7 +21,9 @@ import java.util.zip.ZipInputStream
  * Uses only JDK APIs (java.net.HttpURLConnection, java.util.zip) + kotlinx.serialization —
  * no third-party HTTP/download/archive library.
  *
- * Subclasses supply the platform-specific asset token, arch, and install target.
+ * The PicoClaw release archive ships TWO executables: `picoclaw` (the agent/gateway Cobra CLI)
+ * and `picoclaw-launcher` (the web-console launcher that serves the management UI on the port).
+ * Both are installed side by side; the launcher is returned as the primary binary to run.
  */
 abstract class JvmBinaryDownloaderBase : BinaryDownloader {
 
@@ -33,10 +35,13 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
     /** CPU architecture token: "x86_64" | "arm64". */
     protected abstract val arch: String
 
-    /** Where to install the extracted binary, and how to name it. */
-    protected abstract fun installTargetFile(): File
+    /**
+     * Directory to install the extracted executables into.
+     * The gateway + launcher live side by side (the launcher spawns the gateway).
+     */
+    protected abstract fun installDir(): File
 
-    /** Mark the installed file executable (chmod +x). */
+    /** Mark the installed file executable (chmod +x). No-op on Windows. */
     protected abstract fun markExecutable(file: File)
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -61,20 +66,26 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
                 try {
                     downloadFile(asset.url, tempArchive, onProgress)
 
-                    // 3. Extract the binary bytes from the archive
-                    val binaryBytes = extractBinaryBytes(tempArchive, asset.name)
-                        ?: return@withContext DownloadResult.Failure(
-                            "Downloaded ${asset.name} but no executable was found inside."
+                    // 3. Extract ALL picoclaw executables (gateway + launcher)
+                    val executables = extractExecutables(tempArchive, asset.name)
+                    if (executables.isEmpty()) {
+                        return@withContext DownloadResult.Failure(
+                            "Downloaded ${asset.name} but found no picoclaw executable inside."
                         )
+                    }
 
-                    // 4. Install to the platform target + chmod
-                    val target = installTargetFile()
-                    target.parentFile?.mkdirs()
-                    target.writeBytes(binaryBytes)
-                    markExecutable(target)
+                    // 4. Install every executable into the bin dir + chmod
+                    val dir = installDir().also { it.mkdirs() }
+                    executables.forEach { (name, bytes) ->
+                        val file = File(dir, name)
+                        file.writeBytes(bytes)
+                        markExecutable(file)
+                    }
                     onProgress(1f)
 
-                    DownloadResult.Success(target.absolutePath)
+                    // 5. Return the launcher (serves the web UI), falling back to the core binary
+                    val primary = pickPrimaryBinary(dir, executables.keys)
+                    DownloadResult.Success(primary.absolutePath)
                 } finally {
                     tempArchive.delete()
                 }
@@ -82,6 +93,20 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
                 DownloadResult.Failure(e.message ?: "Download failed (${e::class.simpleName})")
             }
         }
+
+    /**
+     * Pick which installed binary to run. The web-console **launcher** is preferred —
+     * the bare `picoclaw` binary is a Cobra agent/gateway CLI and does NOT serve the web UI
+     * (running it with `-port` fails with `unknown command`).
+     */
+    private fun pickPrimaryBinary(dir: File, names: Set<String>): File {
+        val preference = listOf(
+            "picoclaw-launcher", "picoclaw-launcher.exe",
+            "picoclaw", "picoclaw.exe",
+        )
+        val chosen = preference.firstOrNull { it in names } ?: names.first()
+        return File(dir, chosen)
+    }
 
     // -------------------------------------------------------------------------
     // GitHub release resolution (mirrors fetch_core_local.dart selectBestAsset)
@@ -174,52 +199,49 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
     }
 
     // -------------------------------------------------------------------------
-    // Archive extraction — zip + tar.gz
+    // Archive extraction — zip + tar.gz (returns basename -> bytes)
     // -------------------------------------------------------------------------
 
-    /** Extract the picoclaw executable's raw bytes from [archive]. Returns null if not found. */
-    private fun extractBinaryBytes(archive: File, assetName: String): ByteArray? {
+    private fun extractExecutables(archive: File, assetName: String): Map<String, ByteArray> {
         val lower = assetName.lowercase()
         return when {
             lower.endsWith(".zip") -> extractFromZip(archive)
             lower.endsWith(".tar.gz") || lower.endsWith(".tgz") ->
                 GZIPInputStream(archive.inputStream().buffered()).use { extractFromTar(it) }
-            else -> archive.readBytes() // raw binary asset (no archive)
+            else -> {
+                val base = assetName.substringAfterLast('/').ifBlank { "picoclaw" }
+                mapOf(base to archive.readBytes())
+            }
         }
     }
 
-    private fun extractFromZip(archive: File): ByteArray? {
-        var best: ByteArray? = null
-        var bestScore = -1
+    private fun extractFromZip(archive: File): Map<String, ByteArray> {
+        val out = LinkedHashMap<String, ByteArray>()
         ZipInputStream(archive.inputStream().buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (entry.isDirectory) continue
+                val base = entry.name.substringAfterLast('/').substringAfterLast('\\')
                 val bytes = zip.readBytes()
-                val score = scoreCandidate(entry.name, bytes.size.toLong())
-                if (score > bestScore) {
-                    bestScore = score
-                    best = bytes
-                }
+                if (isExecutableCandidate(base)) out[base] = bytes
             }
         }
-        return if (bestScore > 0) best else null
+        return out
     }
 
     /** Minimal POSIX tar reader (ustar) — sufficient for release archives. */
-    private fun extractFromTar(input: InputStream): ByteArray? {
+    private fun extractFromTar(input: InputStream): Map<String, ByteArray> {
         val stream = BufferedInputStream(input)
         val header = ByteArray(512)
-        var best: ByteArray? = null
-        var bestScore = -1
+        val out = LinkedHashMap<String, ByteArray>()
 
         while (true) {
             if (!readFully(stream, header)) break
-            // Empty block marks end of archive
+            // Empty 512-byte block marks the end of the archive
             if (header.all { it == 0.toByte() }) break
 
-            val name = String(header, 0, 100, Charsets.UTF_8).trimEnd(' ', ' ')
-            val sizeOctal = String(header, 124, 12, Charsets.UTF_8).trim().trimEnd(' ', ' ')
+            val name = String(header, 0, 100, Charsets.UTF_8).substringBefore(' ').trim()
+            val sizeOctal = String(header, 124, 12, Charsets.UTF_8).substringBefore(' ').trim()
             val size = sizeOctal.toLongOrNull(8) ?: 0L
             val typeFlag = header[156].toInt().toChar()
 
@@ -230,33 +252,24 @@ abstract class JvmBinaryDownloaderBase : BinaryDownloader {
             val padding = ((512 - (bodySize % 512)) % 512)
             if (padding > 0) skipFully(stream, padding)
 
-            // Regular file?  typeFlag '0' or NUL
+            // Regular file? typeFlag '0' (or NUL for old archives)
             if (typeFlag == '0' || typeFlag == ' ') {
-                val score = scoreCandidate(name, size)
-                if (score > bestScore) {
-                    bestScore = score
-                    best = body
-                }
+                val base = name.substringAfterLast('/').substringAfterLast('\\')
+                if (isExecutableCandidate(base)) out[base] = body
             }
         }
-        return if (bestScore > 0) best else null
+        return out
     }
 
-    /** Score a candidate archive entry — higher = more likely the picoclaw binary. */
-    private fun scoreCandidate(entryName: String, size: Long): Int {
-        val base = entryName.substringAfterLast('/').substringAfterLast('\\').lowercase()
-        // Exclude obvious non-binaries
+    /** True for picoclaw executables (gateway + launcher); excludes text/metadata files. */
+    private fun isExecutableCandidate(baseName: String): Boolean {
+        val base = baseName.lowercase()
+        if (base.isEmpty()) return false
         if (base.endsWith(".txt") || base.endsWith(".md") || base.endsWith(".json") ||
-            base.endsWith(".sha256") || base.endsWith(".sig") || base.isEmpty()
-        ) return -1
-
-        var score = 0
-        if (base == "picoclaw" || base == "picoclaw.exe" || base == "libpicoclaw.so") score += 100
-        else if (base.startsWith("picoclaw")) score += 50
-        // Prefer larger files (the binary is bigger than helper scripts)
-        if (size > 100_000) score += 10
-        if (size > 1_000_000) score += 10
-        return if (score > 0) score else 1 // fall back: any file is a weak candidate
+            base.endsWith(".sha256") || base.endsWith(".sig") || base.endsWith(".yaml") ||
+            base.endsWith(".yml") || base.endsWith(".toml")
+        ) return false
+        return base.startsWith("picoclaw")
     }
 
     // -------------------------------------------------------------------------
