@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile all KMP targets
+        run: |
+          ./gradlew \
+            :shared:compileKotlinJvm \
+            :shared:compileKotlinIosArm64 \
+            :shared:compileKotlinJs \
+            :shared:compileKotlinWasmJs \
+            :shared:compileAndroidMain \
+            --stacktrace
+
+      - name: Run unit tests
+        run: ./gradlew :shared:jvmTest :shared:testAndroidHostTest --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: shared/build/reports/tests/
+          if-no-files-found: ignore
